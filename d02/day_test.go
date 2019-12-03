@@ -33,6 +33,7 @@ func runProgram(opcodes []int) error {
 		}
 	}
 }
+
 func TestProgram(t *testing.T) {
 	cc := []struct {
 		input  []int
@@ -97,4 +98,49 @@ func TestFirst(t *testing.T) {
 	err = runProgram(input)
 	a.NoError(err)
 	a.Equal(3895705, input[0])
+}
+
+func TestSecond(t *testing.T) {
+	a := assert.New(t)
+	f, err := os.Open("./input")
+	a.NoError(err)
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Split(SplitByte(','))
+	var input []int
+	for scanner.Scan() {
+		text := scanner.Text()
+		opcode, err := strconv.Atoi(strings.TrimSpace(text))
+		a.NoError(err)
+		input = append(input, opcode)
+	}
+	a.NoError(scanner.Err())
+
+	input[1] = 12
+	input[2] = 2
+
+	goal := 19690720
+
+	for noun := 0; noun < 100; noun++ {
+		for verb := 0; verb < 100; verb++ {
+			inputcopy := make([]int, 0, len(input))
+			for _, i := range input {
+				inputcopy = append(inputcopy, i)
+			}
+
+			inputcopy[1] = noun
+			inputcopy[2] = verb
+
+			err = runProgram(inputcopy)
+			if err != nil {
+				continue
+			}
+			if inputcopy[0] != goal {
+				continue
+			}
+			a.Equal(6417, 100*noun+verb)
+			return
+		}
+	}
 }
