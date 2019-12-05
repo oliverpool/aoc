@@ -12,116 +12,82 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func read1(opcodes []int, i int) int {
+	mode := opcodes[i] / 100
+	one := opcodes[i+1]
+	if mode%10 == 0 { // position mode
+		one = opcodes[one]
+	}
+	return one
+}
+
+func read2(opcodes []int, i int) (int, int) {
+	mode := opcodes[i] / 100
+	one := opcodes[i+1]
+	if mode%10 == 0 { // position mode
+		one = opcodes[one]
+	}
+
+	mode /= 10
+	two := opcodes[i+2]
+	if mode%10 == 0 { // position mode
+		two = opcodes[two]
+	}
+	return one, two
+}
+
 func runProgram(opcodes []int, input int) ([]int, error) {
 	i := 0
 	var output []int
 	for {
 		switch opcodes[i] % 100 {
-		case 1:
-			mode := opcodes[i] / 100
-			left := opcodes[i+1]
-			if mode%10 == 0 { // position mode
-				left = opcodes[left]
-			}
-			mode /= 10
-			right := opcodes[i+2]
-			if mode%10 == 0 { // position mode
-				right = opcodes[right]
-			}
+		case 1: // add
+			left, right := read2(opcodes, i)
 			opcodes[opcodes[i+3]] = left + right
 			i += 4
-		case 2:
-			mode := opcodes[i] / 100
-			left := opcodes[i+1]
-			if mode%10 == 0 { // position mode
-				left = opcodes[left]
-			}
-			mode /= 10
-			right := opcodes[i+2]
-			if mode%10 == 0 { // position mode
-				right = opcodes[right]
-			}
+		case 2: // multiply
+			left, right := read2(opcodes, i)
 			opcodes[opcodes[i+3]] = left * right
 			i += 4
-		case 3:
+		case 3: // write
 			pos := opcodes[i+1]
 			opcodes[pos] = input
 			i += 2
-		case 4:
-			mode := opcodes[i] / 100
-			pos := opcodes[i+1]
-			if mode%10 == 0 { // position mode
-				pos = opcodes[pos]
-			}
+		case 4: // read
+			pos := read1(opcodes, i)
 			output = append(output, pos)
 			i += 2
-		case 5:
-			mode := opcodes[i] / 100
-			first := opcodes[i+1]
-			if mode%10 == 0 { // position mode
-				first = opcodes[first]
-			}
-			mode /= 10
-			second := opcodes[i+2]
-			if mode%10 == 0 { // position mode
-				second = opcodes[second]
-			}
-			if first != 0 {
-				i = second
+		case 5: // jump-if-true
+			left, right := read2(opcodes, i)
+			if left != 0 {
+				i = right
 			} else {
 				i += 3
 			}
-		case 6:
-			mode := opcodes[i] / 100
-			first := opcodes[i+1]
-			if mode%10 == 0 { // position mode
-				first = opcodes[first]
-			}
-			mode /= 10
-			second := opcodes[i+2]
-			if mode%10 == 0 { // position mode
-				second = opcodes[second]
-			}
-			if first == 0 {
-				i = second
+		case 6: // jump-if-false
+			left, right := read2(opcodes, i)
+			if left == 0 {
+				i = right
 			} else {
 				i += 3
 			}
-		case 7:
-			mode := opcodes[i] / 100
-			first := opcodes[i+1]
-			if mode%10 == 0 { // position mode
-				first = opcodes[first]
-			}
-			mode /= 10
-			second := opcodes[i+2]
-			if mode%10 == 0 { // position mode
-				second = opcodes[second]
-			}
-			if first < second {
+		case 7: // less than
+			left, right := read2(opcodes, i)
+			if left < right {
 				opcodes[opcodes[i+3]] = 1
 			} else {
 				opcodes[opcodes[i+3]] = 0
 			}
 			i += 4
-		case 8:
-			mode := opcodes[i] / 100
-			first := opcodes[i+1]
-			if mode%10 == 0 { // position mode
-				first = opcodes[first]
-			}
-			mode /= 10
-			second := opcodes[i+2]
-			if mode%10 == 0 { // position mode
-				second = opcodes[second]
-			}
-			if first == second {
+		case 8: // equals
+			left, right := read2(opcodes, i)
+			if left == right {
 				opcodes[opcodes[i+3]] = 1
 			} else {
 				opcodes[opcodes[i+3]] = 0
 			}
 			i += 4
-		case 99:
+		case 99: // halt
 			return output, nil
 		default:
 			return nil, fmt.Errorf("unsupported opcode %d (at position %d)", opcodes[i], i)
