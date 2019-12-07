@@ -86,6 +86,7 @@ func runProgram(opcodes []int, input <-chan int, output chan<- int) error {
 			}
 			i += 4
 		case 99: // halt
+			close(output)
 			return nil
 		default:
 			return fmt.Errorf("unsupported opcode %d (at position %d)", opcodes[i], i)
@@ -202,4 +203,119 @@ func TestFirst(t *testing.T) {
 
 	out := findMax(input)
 	a.Equal(880726, out)
+}
+
+func possiblePermutations(phases []int) [][]int {
+	out := make([][]int, 0)
+	if len(phases) == 1 {
+		return [][]int{phases}
+	}
+
+	for i, v := range phases {
+		withoutCurrent := append([]int(nil), phases[0:i]...)
+		withoutCurrent = append(withoutCurrent, phases[i+1:]...)
+		next := possiblePermutations(withoutCurrent)
+		for _, n := range next {
+			one := []int{v}
+			one = append(one, n...)
+			out = append(out, one)
+		}
+	}
+	return out
+}
+
+func TestPermutations(t *testing.T) {
+	cc := []struct {
+		input []int
+		n     int
+	}{
+		{[]int{0}, 1},
+		{[]int{1, 2}, 2},
+		{[]int{1, 2, 3}, 6},
+	}
+	for _, c := range cc {
+		t.Run("Pogram ", func(t *testing.T) {
+			a := assert.New(t)
+			p := possiblePermutations(c.input)
+			a.Equal(c.n, len(p))
+		})
+	}
+}
+
+func runForever(phases []int, opcodes []int) int {
+	firstWire := make(chan int, 2)
+
+	inWire := firstWire
+
+	for _, p := range phases {
+		o := append([]int(nil), opcodes...)
+
+		inWire <- p
+		outWire := make(chan int, 1)
+		go runProgram(o, inWire, outWire)
+
+		inWire = outWire
+	}
+	firstWire <- 0
+	var last int
+	for v := range inWire {
+		last = v
+		firstWire <- v
+	}
+	return last
+}
+
+func findMaxForever(phases []int, opcodes []int) int {
+	max := 0
+	for _, p := range possiblePermutations(phases) {
+		m := runForever(p, opcodes)
+		if m > max {
+			max = m
+		}
+	}
+	return max
+}
+
+func TestProgramForever(t *testing.T) {
+	cc := []struct {
+		input  []int
+		phases []int
+		max    int
+	}{
+		{[]int{3, 26, 1001, 26, -4, 26, 3, 27, 1002, 27, 2, 27, 1, 27, 26,
+			27, 4, 27, 1001, 28, -1, 28, 1005, 28, 6, 99, 0, 0, 5}, []int{9, 8, 7, 6, 5}, 139629729},
+		{[]int{3, 52, 1001, 52, -5, 52, 3, 53, 1, 52, 56, 54, 1007, 54, 5, 55, 1005, 55, 26, 1001, 54,
+			-5, 54, 1105, 1, 12, 1, 53, 54, 53, 1008, 54, 0, 55, 1001, 55, 1, 55, 2, 53, 55, 53, 4,
+			53, 1001, 56, -1, 56, 1005, 56, 6, 99, 0, 0, 0, 0, 10}, []int{9, 7, 8, 5, 6}, 18216},
+	}
+	for _, c := range cc {
+		t.Run("Pogram ", func(t *testing.T) {
+			a := assert.New(t)
+			out := runForever(c.phases, c.input)
+			a.Equal(c.max, out)
+			out = findMaxForever(c.phases, c.input)
+			a.Equal(c.max, out)
+		})
+	}
+}
+
+func TestSecond(t *testing.T) {
+	a := assert.New(t)
+	f, err := os.Open("./input")
+	a.NoError(err)
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Split(SplitByte(','))
+	var input []int
+	for scanner.Scan() {
+		text := scanner.Text()
+		opcode, err := strconv.Atoi(strings.TrimSpace(text))
+		a.NoError(err)
+		input = append(input, opcode)
+	}
+	a.NoError(scanner.Err())
+
+	out := findMaxForever([]int{5, 6, 7, 8, 9}, input)
+	a.Equal(4931744, out)
 }
