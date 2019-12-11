@@ -174,9 +174,9 @@ type robot struct {
 	Direction direction
 }
 
-func newRobot() robot {
+func newRobot(start color) robot {
 	return robot{
-		Map: make(map[coord]color),
+		Map: map[coord]color{coord{}: start},
 	}
 }
 
@@ -216,7 +216,7 @@ func TestProgramSpecial(t *testing.T) {
 
 			out := make(chan color, 1)
 
-			robot := newRobot()
+			robot := newRobot(black)
 			go robot.run(in, out)
 			i := 0
 			for o := range out {
@@ -287,8 +287,91 @@ func TestFirst(t *testing.T) {
 		close(in)
 	}()
 
-	r := newRobot()
+	r := newRobot(black)
 	r.run(out, outColor)
 
 	a.Equal(1709, len(r.Map))
+}
+
+func TestSecond(t *testing.T) {
+	a := assert.New(t)
+	f, err := os.Open("./input")
+	a.NoError(err)
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Split(SplitByte(','))
+	input := make(map[int]int)
+	i := 0
+	for scanner.Scan() {
+		text := scanner.Text()
+		opcode, err := strconv.Atoi(strings.TrimSpace(text))
+		a.NoError(err)
+		input[i] = opcode
+		i++
+	}
+	a.NoError(scanner.Err())
+
+	in := make(chan int)
+	outColor := make(chan color)
+
+	out := make(chan int)
+	go func() {
+		a.NoError(runProgram(input, in, out))
+	}()
+
+	go func() {
+		for o := range outColor {
+			in <- int(o)
+		}
+		close(in)
+	}()
+
+	r := newRobot(white)
+	r.run(out, outColor)
+	minX, maxX, minY, maxY := mapBound(r.Map)
+	// PGUEHCJH
+	output := []string{
+		" ###   ##  #  # #### #  #  ##    ## #  #   ",
+		" #  # #  # #  # #    #  # #  #    # #  #   ",
+		" #  # #    #  # ###  #### #       # ####   ",
+		" ###  # ## #  # #    #  # #       # #  #   ",
+		" #    #  # #  # #    #  # #  # #  # #  #   ",
+		" #     ###  ##  #### #  #  ##   ##  #  #   ",
+		"",
+	}
+	for y := minY; y <= maxY; y++ {
+		s := ""
+		for x := minX; x <= maxX; x++ {
+			c := r.Map[coord{x, y}]
+			if c == white {
+				s += "#"
+			} else {
+				s += " "
+			}
+		}
+		t.Log(s)
+		a.Equal(output[y-minY], s)
+	}
+
+	a.Equal(249, len(r.Map))
+}
+
+func mapBound(m map[coord]color) (int, int, int, int) {
+	minX, maxX, minY, maxY := 0, 0, 0, 0
+	for c := range m {
+		if c.x < minX {
+			minX = c.x
+		}
+		if c.x > maxX {
+			maxX = c.x
+		}
+		if c.y < minY {
+			minY = c.y
+		}
+		if c.y > maxY {
+			maxY = c.y
+		}
+	}
+	return minX, maxX, minY, maxY
 }
