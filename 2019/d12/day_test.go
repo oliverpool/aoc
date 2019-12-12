@@ -197,3 +197,144 @@ func TestFirst(t *testing.T) {
 	k := kineticAfter(moons, 1000)
 	a.Equal(12082, k)
 }
+
+func repeatingMotion(pos []int) int {
+	initialPos := make([]int, len(pos))
+	copy(initialPos, pos)
+	vel := make([]int, len(pos))
+	n := 0
+
+	isBackToInial := func() bool {
+		for _, v := range vel {
+			if v != 0 {
+				return false
+			}
+		}
+		for i, p := range pos {
+			if p != initialPos[i] {
+				return false
+			}
+		}
+		return true
+	}
+
+	for {
+		// compute new velocity
+		for i := range pos {
+			for j := i + 1; j < len(pos); j++ {
+				s := sign(pos[i], pos[j])
+				vel[i] -= s
+				vel[j] += s
+			}
+		}
+
+		// update position
+		for i, v := range vel {
+			pos[i] += v
+		}
+		n++
+		if isBackToInial() {
+			return n
+		}
+	}
+}
+
+func backToInial(moons []point) int {
+	var pos [3][]int
+	var steps []int
+	for _, m := range moons {
+		pos[0] = append(pos[0], m.x)
+		pos[1] = append(pos[1], m.y)
+		pos[2] = append(pos[2], m.z)
+	}
+	for i := range pos {
+		steps = append(steps, repeatingMotion(pos[i]))
+	}
+	return lcm(steps...)
+}
+
+func gcd(x, y int) int {
+	for y != 0 {
+		x, y = y, x%y
+	}
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+func lcm(i ...int) int {
+	if len(i) < 1 {
+		panic("at least one argument is necessary")
+	} else if len(i) == 1 {
+		return i[0]
+	} else {
+		a, b := i[0], lcm(i[1:]...)
+		return a * b / gcd(a, b)
+	}
+}
+
+func TestRepeatingMotion(t *testing.T) {
+	cc := []struct {
+		coord []int
+		steps int
+	}{
+		{
+			[]int{-1, 2, 4, 3},
+			18,
+		},
+		{
+			[]int{0, -10, -8, 5},
+			28,
+		},
+		{
+			[]int{2, -7, 8, -1},
+			44,
+		},
+	}
+	for _, c := range cc {
+		t.Run("", func(t *testing.T) {
+			a := assert.New(t)
+			n := repeatingMotion(c.coord)
+			a.Equal(c.steps, n)
+		})
+	}
+
+	a := assert.New(t)
+	a.Equal(2772, lcm(18, 28, 44))
+}
+
+func TestBackToInitial(t *testing.T) {
+	cc := []struct {
+		moons []point
+		steps int
+	}{
+		{
+			[]point{{-1, 0, 2}, {2, -10, -7}, {4, -8, 8}, {3, 5, -1}},
+			2772,
+		},
+		{
+			[]point{{-8, -10, 0}, {5, 5, 10}, {2, -7, 3}, {9, -8, -3}},
+			4686774924,
+		},
+	}
+	for _, c := range cc {
+		t.Run("", func(t *testing.T) {
+			a := assert.New(t)
+			n := backToInial(c.moons)
+			a.Equal(c.steps, n)
+		})
+	}
+}
+
+func TestSecond(t *testing.T) {
+	a := assert.New(t)
+	f, err := os.Open("./input")
+	a.NoError(err)
+	moons, err := parseMoons(f)
+	f.Close()
+	a.NoError(err)
+
+	n := backToInial(moons)
+	a.Equal(295693702908636, n)
+}
