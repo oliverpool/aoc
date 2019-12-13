@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -65,8 +66,28 @@ type point struct {
 }
 type tile int
 
+func (t tile) String() string {
+	switch t {
+	case empty:
+		return " "
+	case wall:
+		return "#"
+	case block:
+		return "*"
+	case paddle:
+		return "="
+	case ball:
+		return "o"
+	}
+	return strconv.Itoa(int(t))
+}
+
 const (
-	block = tile(2)
+	empty  = tile(0)
+	wall   = tile(1)
+	block  = tile(2)
+	paddle = tile(3)
+	ball   = tile(4)
 )
 
 func read1(opcodes map[int]int, i, base int) int {
@@ -217,4 +238,102 @@ func TestFirst(t *testing.T) {
 		}
 	}
 	a.Equal(205, count)
+}
+
+func gameToString(tiles map[point]tile) string {
+	var xMin, xMax, yMin, yMax int
+	for p := range tiles {
+		if p.x < xMin {
+			xMin = p.x
+		} else if p.x > xMax {
+			xMax = p.x
+		}
+		if p.y < yMin {
+			yMin = p.y
+		} else if p.y > yMax {
+			yMax = p.y
+		}
+	}
+
+	output := ""
+	for y := yMin; y <= yMax; y++ {
+		for x := xMin; x <= xMax; x++ {
+			output += fmt.Sprint(tiles[point{x, y}])
+		}
+		output += "\n"
+	}
+	return output
+}
+
+func play(intcodes <-chan int, joystick chan<- int) int {
+	tiles := make(map[point]tile)
+
+	var pBall, pPaddle point
+	pBallDirection := 0
+	nextMove := 0
+	for {
+		select {
+		case x, ok := <-intcodes:
+			if !ok {
+				return int(tiles[point{-1, 0}])
+			}
+			y := <-intcodes
+			t := tile(<-intcodes)
+			p := point{x, y}
+			tiles[p] = t
+			if t == ball {
+				if pBall.x > p.x {
+					pBallDirection = -1
+				} else if pBall.x == p.x {
+					pBallDirection = 0
+				} else {
+					pBallDirection = 1
+				}
+				pBall = p
+			} else if t == paddle {
+				pPaddle = p
+			}
+			if pBall.x == pPaddle.x {
+				if pBall.y == pPaddle.y-1 {
+					nextMove = 0
+				} else {
+					nextMove = pBallDirection
+				}
+			} else if pBall.x+pBallDirection > pPaddle.x {
+				nextMove = 1
+			} else if pBall.x+pBallDirection < pPaddle.x {
+				nextMove = -1
+			} else {
+				nextMove = 0
+			}
+
+		case joystick <- nextMove:
+			fmt.Println(gameToString(tiles))
+		}
+	}
+}
+
+func TestSecond(t *testing.T) {
+	a := assert.New(t)
+	var intcodes map[int]int
+	var err error
+	err = open("./input", func(r io.Reader) error {
+		intcodes, err = parseInput(r)
+		return err
+	})
+	a.NoError(err)
+
+	// put quarters
+	intcodes[0] = 2
+
+	pOutput := make(chan int)
+	pInput := make(chan int)
+	go func() {
+		err := runProgram(intcodes, pInput, pOutput)
+		a.NoError(err)
+	}()
+
+	score := play(pOutput, pInput)
+
+	a.Equal(10292, score)
 }
