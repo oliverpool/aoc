@@ -228,5 +228,10 @@ func TestSecond(t *testing.T) {
 		t.Log(fuels, usedOre)
 	}
 
-	a.Equal(2267486, fuels-1)
+	for usedOre > maxOre {
+		fuels--
+		usedOre = reduceReaction(reactions, fuels)
+	}
+
+	a.Equal(2267486, fuels)
 }
