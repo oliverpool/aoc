@@ -112,7 +112,7 @@ func TestParse(t *testing.T) {
 			t.Log(d)
 			a.Equal(len(m)+1, len(d)) // + ORE
 
-			ore := reduceReaction(m)
+			ore := reduceReaction(m, 1)
 			a.Equal(c.ore, ore)
 		})
 	}
@@ -152,7 +152,7 @@ func computeDepth(r map[chemical]reaction) map[chemical]int {
 	return depths
 }
 
-func reduceReaction(reactions map[chemical]reaction) int {
+func reduceReaction(reactions map[chemical]reaction, fuels int) int {
 	depths := computeDepth(reactions)
 	maxDepth := func(cc map[chemical]int) int {
 		dmax := 0
@@ -164,7 +164,10 @@ func reduceReaction(reactions map[chemical]reaction) int {
 		}
 		return dmax
 	}
-	aggregate := reactions["FUEL"].input
+	aggregate := make(map[chemical]int, len(reactions["FUEL"].input))
+	for i, n := range reactions["FUEL"].input {
+		aggregate[i] = fuels * n
+	}
 	for len(aggregate) > 1 {
 		d := maxDepth(aggregate)
 		for c, n := range aggregate {
@@ -195,6 +198,35 @@ func TestFirst(t *testing.T) {
 	})
 	a.NoError(err)
 
-	ore := reduceReaction(reactions)
+	ore := reduceReaction(reactions, 1)
 	a.Equal(1582325, ore)
+}
+
+func TestSecond(t *testing.T) {
+	a := assert.New(t)
+	var reactions map[chemical]reaction
+	var err error
+	err = open("./input", func(r io.Reader) error {
+		reactions, err = parseInput(r)
+		return err
+	})
+	a.NoError(err)
+
+	maxOre := 1000000000000
+
+	fuels := 1
+	usedOre := reduceReaction(reactions, fuels)
+	for usedOre < maxOre {
+		orePerFuel := usedOre / fuels
+		delta := (maxOre - usedOre) / orePerFuel
+		if delta <= 0 {
+			delta = 1
+		}
+		fuels += delta
+
+		usedOre = reduceReaction(reactions, fuels)
+		t.Log(fuels, usedOre)
+	}
+
+	a.Equal(2267486, fuels-1)
 }
