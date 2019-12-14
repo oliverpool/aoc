@@ -112,7 +112,7 @@ func TestParse(t *testing.T) {
 			t.Log(d)
 			a.Equal(len(m)+1, len(d)) // + ORE
 
-			ore := reduceReaction(m, d)
+			ore := reduceReaction(m)
 			a.Equal(c.ore, ore)
 		})
 	}
@@ -152,7 +152,8 @@ func computeDepth(r map[chemical]reaction) map[chemical]int {
 	return depths
 }
 
-func reduceReaction(reactions map[chemical]reaction, depths map[chemical]int) int {
+func reduceReaction(reactions map[chemical]reaction) int {
+	depths := computeDepth(reactions)
 	maxDepth := func(cc map[chemical]int) int {
 		dmax := 0
 		for c := range cc {
@@ -194,8 +195,6 @@ func TestFirst(t *testing.T) {
 	})
 	a.NoError(err)
 
-	depths := computeDepth(reactions)
-
-	ore := reduceReaction(reactions, depths)
-	a.Equal(205, ore)
+	ore := reduceReaction(reactions)
+	a.Equal(1582325, ore)
 }
