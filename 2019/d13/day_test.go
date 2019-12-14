@@ -308,7 +308,7 @@ func play(intcodes <-chan int, joystick chan<- int) int {
 			}
 
 		case joystick <- nextMove:
-			fmt.Println(gameToString(tiles))
+			// fmt.Println(gameToString(tiles))
 		}
 	}
 }
