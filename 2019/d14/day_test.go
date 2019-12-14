@@ -216,6 +216,7 @@ func TestSecond(t *testing.T) {
 
 	fuels := 1
 	usedOre := reduceReaction(reactions, fuels)
+	t.Log(fuels, usedOre)
 	for usedOre < maxOre {
 		orePerFuel := usedOre / fuels
 		delta := (maxOre - usedOre) / orePerFuel
