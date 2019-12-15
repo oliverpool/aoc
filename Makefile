@@ -1,2 +1,2 @@
 test:
-	go test ./2019/...
+	go test ./d*
