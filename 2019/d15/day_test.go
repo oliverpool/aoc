@@ -105,7 +105,7 @@ func (dm distanceMap) moveLowest(c coord) coord {
 	return next
 }
 
-func searchOxygen(statuses <-chan status, directions chan<- direction) int {
+func searchOxygen(statuses <-chan status, directions chan<- direction) (statusMap, distanceMap, coord) {
 	var current coord
 	m := statusMap{current: free}
 	var breadcrumb []direction
@@ -121,8 +121,7 @@ func searchOxygen(statuses <-chan status, directions chan<- direction) int {
 			}
 
 			if len(breadcrumb) == 0 {
-				fmt.Println(m)
-				return pathLengthToOrigin(oxygenCoord, distances)
+				return m, distances, oxygenCoord
 			}
 
 			l := len(breadcrumb) - 1
@@ -141,7 +140,7 @@ func searchOxygen(statuses <-chan status, directions chan<- direction) int {
 			breadcrumb = append(breadcrumb, d.back())
 			distances[current] = len(breadcrumb)
 			if s == oxygen {
-				fmt.Println("oxygen", moved)
+				// fmt.Println("oxygen", moved)
 				oxygenCoord = current
 			}
 		}
@@ -210,6 +209,27 @@ func trainingMap(m map[coord]status) func(statuses chan<- status, directions <-c
 	}
 }
 
+func oxygenDeploy(start coord, m statusMap) int {
+	t := 0
+	justFilled := []coord{start}
+	delete(m, start)
+	for len(justFilled) > 0 {
+		next := make([]coord, 0, len(justFilled))
+		for _, c := range justFilled {
+			for _, d := range []direction{north, south, west, east} {
+				n := c.move(d)
+				if m[n] == free {
+					next = append(next, n)
+					delete(m, n)
+				}
+			}
+		}
+		justFilled = next
+		t++
+	}
+	return t - 1
+}
+
 func TestMap(t *testing.T) {
 	cc := []struct {
 		m        statusMap
@@ -233,7 +253,10 @@ func TestMap(t *testing.T) {
 			directions := make(chan direction)
 
 			go trainingMap(c.m)(statuses, directions)
-			distance := searchOxygen(statuses, directions)
+
+			m, distances, oxygenCoord := searchOxygen(statuses, directions)
+			t.Log(m)
+			distance := pathLengthToOrigin(oxygenCoord, distances)
 			a.Equal(c.distance, distance)
 		})
 	}
@@ -272,7 +295,49 @@ func TestFirst(t *testing.T) {
 		a.NoError(err)
 	}()
 
-	distance := searchOxygen(statuses, directions)
+	m, distances, oxygenCoord := searchOxygen(statuses, directions)
+	t.Log(m)
+	distance := pathLengthToOrigin(oxygenCoord, distances)
 
 	a.Equal(262, distance)
+}
+
+func TestSecond(t *testing.T) {
+	a := assert.New(t)
+	var intcodes map[int]int
+	var err error
+	err = open("./input", func(r io.Reader) error {
+		intcodes, err = parseInput(r)
+		return err
+	})
+	a.NoError(err)
+
+	statuses := make(chan status)
+	directions := make(chan direction)
+
+	pOutput := make(chan int)
+	pInput := make(chan int)
+
+	go func() {
+		for d := range directions {
+			pInput <- int(d)
+		}
+	}()
+
+	go func() {
+		for s := range pOutput {
+			statuses <- status(s)
+		}
+	}()
+
+	go func() {
+		err := runProgram(intcodes, pInput, pOutput)
+		a.NoError(err)
+	}()
+
+	m, _, oxygenCoord := searchOxygen(statuses, directions)
+	t.Log("\n" + m.String())
+	minutes := oxygenDeploy(oxygenCoord, m)
+
+	a.Equal(314, minutes)
 }
