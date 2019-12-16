@@ -59,8 +59,8 @@ func fft(ins string, phases, skip int) string {
 		phases--
 	}
 
-	out := make([]byte, 0, len(in))
-	for _, i := range in {
+	out := make([]byte, 0, 8)
+	for _, i := range in[:8] {
 		out = append(out, '0'+byte(i))
 	}
 	return string(out)
@@ -226,7 +226,7 @@ func TestNPhases(t *testing.T) {
 			a := assert.New(t)
 
 			output := fft(c.input, c.phases, 0)
-			a.Equal(c.output8, output[:8])
+			a.Equal(c.output8, output)
 		})
 	}
 }
@@ -240,7 +240,7 @@ func TestFirst(t *testing.T) {
 
 	out := fft(ins, 100, 0)
 
-	a.Equal("12541048", out[:8])
+	a.Equal("12541048", out)
 }
 
 func TestThousand(t *testing.T) {
@@ -270,14 +270,12 @@ func TestThousand(t *testing.T) {
 			a := assert.New(t)
 
 			output := fftTenThousand(c.input, c.phases)
-			a.Equal(c.output8, output[:8])
+			a.Equal(c.output8, output)
 		})
 	}
 }
 
 func TestSecond(t *testing.T) {
-	// defer profile.Start().Stop()
-
 	a := assert.New(t)
 
 	in, err := ioutil.ReadFile("./input")
@@ -286,5 +284,5 @@ func TestSecond(t *testing.T) {
 
 	out := fftTenThousand(ins, 100)
 
-	a.Equal("62858988", out[:8])
+	a.Equal("62858988", out)
 }
