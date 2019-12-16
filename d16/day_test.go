@@ -101,7 +101,7 @@ func fftOneFaster(sums []int, shift, skip int) int {
 		}
 		out += sums[end] - sums[first]
 
-		// add -ones
+		// substract ones
 		f := first + 2*(shift+1)
 		if f >= li {
 			continue
@@ -141,17 +141,13 @@ func fftOneFast(in []int, shift, skip int) int {
 }
 
 func fftTenThousand(ins string, phases int) string {
-	// fmt.Println(len(ins))
 	skip, _ := strconv.Atoi(ins[:7])
 	ins = strings.Repeat(ins, 10000)
-	// fmt.Println(len(ins))
+
+	// a number final value only depend on following numbers
 	ins = ins[skip:]
-	// fmt.Println(len(ins))
-	// fmt.Println(skip, ins[:8])
 
-	f := fft(ins, phases, skip)
-
-	return f
+	return fft(ins, phases, skip)
 }
 
 func TestFFTOne(t *testing.T) {
