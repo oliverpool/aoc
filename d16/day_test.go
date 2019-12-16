@@ -10,7 +10,7 @@ import (
 	assert "github.com/stretchr/testify/require"
 )
 
-func fft(ins string, phases, skip int) string {
+func fftSlow(ins string, phases, skip int) string {
 	in := make([]int, 0, len(ins))
 	for _, b := range ins {
 		in = append(in, int(b-'0'))
@@ -25,6 +25,37 @@ func fft(ins string, phases, skip int) string {
 			in2[i] = fftOneFast(in, skip+i, skip)
 		}
 		copy(in, in2)
+		phases--
+	}
+
+	out := make([]byte, 0, len(in))
+	for _, i := range in {
+		out = append(out, '0'+byte(i))
+	}
+	return string(out)
+}
+
+func fft(ins string, phases, skip int) string {
+	in := make([]int, 0, len(ins))
+	for _, b := range ins {
+		in = append(in, int(b-'0'))
+	}
+
+	sums := make([]int, len(in)+1)
+	for phases > 0 {
+		if phases%10 == 0 {
+			// fmt.Println(phases)
+		}
+
+		sum := 0
+		for i, v := range in {
+			sum += v
+			sums[i+1] = sum
+		}
+
+		for i := range in {
+			in[i] = fftOneFaster(sums, skip+i, skip)
+		}
 		phases--
 	}
 
@@ -52,6 +83,36 @@ func fftOne(in []int, shift int) int {
 		}
 		out += s * v
 	}
+	if out < 0 {
+		out = -out
+	}
+	return out % 10
+}
+
+func fftOneFaster(sums []int, shift, skip int) int {
+	out := 0
+	li := len(sums)
+	for first := shift - skip; first < li; first += 4 * (shift + 1) {
+
+		// add ones
+		end := first + shift + 1
+		if end >= li {
+			end = li - 1
+		}
+		out += sums[end] - sums[first]
+
+		// add -ones
+		f := first + 2*(shift+1)
+		if f >= li {
+			continue
+		}
+		end = f + shift + 1
+		if end >= li {
+			end = li - 1
+		}
+		out -= sums[end] - sums[f]
+	}
+
 	if out < 0 {
 		out = -out
 	}
@@ -140,6 +201,11 @@ func TestNPhases(t *testing.T) {
 	}{
 		{
 			"12345678",
+			1,
+			"48226158",
+		},
+		{
+			"12345678",
 			4,
 			"01029498",
 		},
@@ -224,5 +290,5 @@ func TestSecond(t *testing.T) {
 
 	out := fftTenThousand(ins, 100)
 
-	a.Equal("12541048", out[:8])
+	a.Equal("62858988", out[:8])
 }
