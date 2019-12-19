@@ -34,13 +34,13 @@ func TestFirst(t *testing.T) {
 
 	output := make(chan int, 10)
 	for x := 0; x < w; x++ {
-		for y := 0; y < h; y++ {
-			go func(x, y int) {
+		go func(x int) {
+			for y := 0; y < h; y++ {
 				o, err := getBeam(intcodes, x, y)
 				a.NoError(err)
 				output <- o
-			}(x, y)
-		}
+			}
+		}(x)
 	}
 	n := 0
 	area := 0
