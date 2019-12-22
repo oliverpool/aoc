@@ -61,3 +61,50 @@ WALK
 
 	a.Equal(19350938, last)
 }
+
+func TestSecond(t *testing.T) {
+	a := assert.New(t)
+	var intcodes map[int]int
+	var err error
+	err = open("./input", func(r io.Reader) error {
+		intcodes, err = parseInput(r)
+		return err
+	})
+	a.NoError(err)
+
+	output := make(chan int, 10)
+	input := make(chan int, 10)
+
+	go func() {
+		err := runProgram(intcodes, input, output)
+		a.NoError(err)
+	}()
+
+	go func() {
+		// jump if A,B or C is a hole AND D is a ground
+		// delay jump if it makes sense:
+		// H (for next jump) or E (for a walk) is a ground
+		for _, l := range `NOT A J
+NOT B T
+OR T J
+NOT C T
+OR T J
+AND D J
+NOT H T
+NOT T T
+OR E T
+AND T J
+RUN
+` {
+			input <- int(l)
+		}
+	}()
+
+	var last int
+	for o := range output {
+		last = o
+		fmt.Print(string(o))
+	}
+
+	a.Equal(1142986901, last)
+}
