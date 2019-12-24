@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -13,6 +14,43 @@ import (
 )
 
 type process []Shuffler
+
+type generalisation struct {
+	factor, shift int64
+}
+
+var identity = generalisation{1, 0}
+
+func (g generalisation) compute(x int64, mod int64) int64 {
+	x = (g.factor*x + g.shift) % mod
+	if x < 0 {
+		return x + mod
+	}
+	return x
+}
+
+func (g generalisation) power(x int64, mod int64, n int) int64 {
+	factor := big.NewInt(g.factor)
+	shift := big.NewInt(g.shift)
+	y := big.NewInt(x)
+	m := big.NewInt(mod)
+
+	for n > 0 {
+		if n%2 == 0 {
+			// f*(f*x+s)+s
+			shift.Add(new(big.Int).Mul(factor, shift), shift)
+			shift.Mod(shift, m)
+
+			factor.Mul(factor, factor)
+			factor.Mod(factor, m)
+			n = n / 2
+		} else {
+			y.Mod(new(big.Int).Add(new(big.Int).Mul(factor, y), shift), m)
+			n--
+		}
+	}
+	return y.Int64()
+}
 
 func (p process) NewPos(n int64) int64 {
 	for _, s := range p {
@@ -29,9 +67,17 @@ func (p process) Inverse() Shuffler {
 	return inv
 }
 
+func (p process) Generalize(g generalisation) generalisation {
+	for _, s := range p {
+		g = s.Generalize(g)
+	}
+	return g
+}
+
 type Shuffler interface {
 	NewPos(int64) int64
 	Inverse() Shuffler
+	Generalize(g generalisation) generalisation
 }
 
 type newStack struct {
@@ -46,6 +92,12 @@ func (ns newStack) Inverse() Shuffler {
 	return ns
 }
 
+func (ns newStack) Generalize(g generalisation) generalisation {
+	g.factor = -g.factor
+	g.shift = (ns.len - g.shift - 1) % ns.len
+	return g
+}
+
 type cutN struct {
 	n, len int64
 }
@@ -57,13 +109,16 @@ func (cn cutN) NewPos(i int64) int64 {
 func (cn cutN) Inverse() Shuffler {
 	return cutN{cn.len - cn.n, cn.len}
 }
+func (cn cutN) Generalize(g generalisation) generalisation {
+	g.shift = (g.shift - cn.n) % cn.len
+	return g
+}
 
 type incN struct {
 	n, len int64
 }
 
 func (in incN) NewPos(i int64) int64 {
-
 	return (i * in.n) % in.len
 }
 
@@ -81,6 +136,16 @@ func (in incN) Inverse() Shuffler {
 	}
 	u = (((u % in.len) + in.len) % in.len)
 	return incN{u, in.len}
+}
+
+func (in incN) Generalize(g generalisation) generalisation {
+	n := big.NewInt(in.n)
+	l := big.NewInt(in.len)
+	// g.factor = (g.factor * in.n) % in.len
+	g.factor = new(big.Int).Mod(new(big.Int).Mul(big.NewInt(g.factor), n), l).Int64()
+	// g.shift = (g.shift * in.n) % in.len
+	g.shift = new(big.Int).Mod(new(big.Int).Mul(big.NewInt(g.shift), n), l).Int64()
+	return g
 }
 
 func TestShuffler(t *testing.T) {
@@ -109,6 +174,12 @@ func TestShuffler(t *testing.T) {
 			a := assert.New(t)
 			out := c.op.NewPos(c.in)
 			a.Equal(c.out, out)
+
+			g := c.op.Generalize(identity)
+			out = g.compute(c.in, 10)
+			t.Log(g)
+			a.Equal(c.out, out)
+
 			inv := c.op.Inverse()
 			a.Equal(c.in, inv.NewPos(out))
 		})
@@ -201,7 +272,10 @@ cut -1`, 10,
 			a.Len(shuf, c.len)
 
 			a.Equal(c.posOf0, shuf.NewPos(0))
+			a.Equal(c.posOf0, shuf.Generalize(identity).compute(0, 10))
+
 			a.Equal(c.valueAt0, shuf.Inverse().NewPos(0))
+			a.Equal(c.valueAt0, shuf.Inverse().Generalize(identity).compute(0, 10))
 		})
 	}
 }
@@ -216,6 +290,21 @@ func TestFirst(t *testing.T) {
 	a.NoError(err)
 
 	a.Equal(int64(3589), shuf.NewPos(2019))
+
+	g := shuf.Generalize(identity)
+
+	t.Log(g)
+
+	a.Equal(int64(3589), g.compute(2019, 10007))
+	a.Equal(int64(3589), g.power(2019, 10007, 1))
+
+	gi := shuf.Inverse().Generalize(identity)
+	a.Equal(int64(2019), gi.power(3589, 10007, 1))
+	a.Equal(int64(1), gi.factor*g.factor%10007)
+	a.Equal(int64(0), (gi.factor*g.shift+gi.shift)%10007)
+	a.Equal(int64(0), (g.factor*gi.shift+g.shift)%10007)
+
+	a.Equal(int64(2019), gi.power(g.power(2019, 10007, 20), 10007, 20))
 }
 
 func TestSecond(t *testing.T) {
@@ -227,22 +316,19 @@ func TestSecond(t *testing.T) {
 	shuf, err := parseProcess(f, 119_315_717_514_047)
 	a.NoError(err)
 
-	inv := shuf.Inverse()
+	g := shuf.Inverse().Generalize(identity)
 
-	p := int64(2020)
-	N := 101_741_582_076_661
-	cache := make(map[int64]bool)
-	for i := 0; i < N; i++ {
-		if cache[p] {
-			fmt.Println(p)
-			fmt.Println(shuf.NewPos(p))
-			panic(p)
-		}
-		cache[p] = true
-		if i%1_000_000 == 0 {
-			fmt.Println(float64(100*i) / float64(N))
-		}
-		p = inv.NewPos(p)
-	}
-	a.Equal(3589, p)
+	p := g.power(2020, 119_315_717_514_047, 101_741_582_076_661)
+	a.Equal(int64(4893716342290), p)
+
+	// gi := shuf.Generalize(identity)
+	// t.Log(gi)
+
+	// a.Equal(int64(1), gi.factor*g.factor%119_315_717_514_047)
+	// a.Equal(int64(0), (gi.factor*g.shift+gi.shift)%119_315_717_514_047)
+	// a.Equal(int64(0), (g.factor*gi.shift+g.shift)%119_315_717_514_047)
+
+	// t.Log(gi.factor * g.factor % 119_315_717_514_047)
+	// n := 1
+	// a.Equal(2020, g.power(gi.power(2020, 119_315_717_514_047, n), 119_315_717_514_047, n))
 }
