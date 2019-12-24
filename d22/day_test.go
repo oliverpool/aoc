@@ -14,7 +14,7 @@ import (
 
 type process []Shuffler
 
-func (p process) NewPos(n int) int {
+func (p process) NewPos(n int64) int64 {
 	for _, s := range p {
 		n = s.NewPos(n)
 	}
@@ -30,15 +30,15 @@ func (p process) Inverse() Shuffler {
 }
 
 type Shuffler interface {
-	NewPos(int) int
+	NewPos(int64) int64
 	Inverse() Shuffler
 }
 
 type newStack struct {
-	len int
+	len int64
 }
 
-func (ns newStack) NewPos(i int) int {
+func (ns newStack) NewPos(i int64) int64 {
 	return ns.len - i - 1
 }
 
@@ -47,10 +47,10 @@ func (ns newStack) Inverse() Shuffler {
 }
 
 type cutN struct {
-	n, len int
+	n, len int64
 }
 
-func (cn cutN) NewPos(i int) int {
+func (cn cutN) NewPos(i int64) int64 {
 	return (((i - cn.n) % cn.len) + cn.len) % cn.len
 }
 
@@ -59,16 +59,17 @@ func (cn cutN) Inverse() Shuffler {
 }
 
 type incN struct {
-	n, len int
+	n, len int64
 }
 
-func (in incN) NewPos(i int) int {
+func (in incN) NewPos(i int64) int64 {
+
 	return (i * in.n) % in.len
 }
 
 func (in incN) Inverse() Shuffler {
-	r, u, v := in.n, 1, 0
-	r2, u2, v2 := in.len, 0, 1
+	r, u, v := in.n, int64(1), int64(0)
+	r2, u2, v2 := in.len, int64(0), int64(1)
 	for r2 != 0 {
 		q := r / r2
 		r, u, v, r2, u2, v2 = r2, u2, v2, r-q*r2, u-q*u2, v-q*v2
@@ -85,7 +86,7 @@ func (in incN) Inverse() Shuffler {
 func TestShuffler(t *testing.T) {
 	cc := []struct {
 		op      Shuffler
-		in, out int
+		in, out int64
 	}{
 		{newStack{10}, 0, 9},
 		{newStack{10}, 2, 7},
@@ -95,9 +96,9 @@ func TestShuffler(t *testing.T) {
 		{cutN{3, 10}, 3, 0},
 		{cutN{3, 10}, 9, 6},
 
-		{cutN{-4, 10}, 0, 4},
-		{cutN{-4, 10}, 9, 3},
-		{cutN{-4, 10}, 6, 0},
+		{cutN{10 - 4, 10}, 0, 4},
+		{cutN{10 - 4, 10}, 9, 3},
+		{cutN{10 - 4, 10}, 6, 0},
 
 		{incN{3, 10}, 0, 0},
 		{incN{3, 10}, 1, 3},
@@ -126,12 +127,12 @@ func parseProcess(r io.Reader, l int) (process, error) {
 			if err != nil {
 				return shuf, err
 			}
-			shuf = append(shuf, incN{n, l})
+			shuf = append(shuf, incN{int64(n), int64(l)})
 			continue
 		}
 
 		if strings.HasPrefix(text, "deal into new stack") {
-			shuf = append(shuf, newStack{l})
+			shuf = append(shuf, newStack{int64(l)})
 			continue
 		}
 
@@ -140,7 +141,11 @@ func parseProcess(r io.Reader, l int) (process, error) {
 			if err != nil {
 				return shuf, err
 			}
-			shuf = append(shuf, cutN{n, l})
+			n = n % l
+			if n < 0 {
+				n += l
+			}
+			shuf = append(shuf, cutN{int64(n), int64(l)})
 			continue
 		}
 
@@ -153,8 +158,8 @@ func TestParse(t *testing.T) {
 	cc := []struct {
 		input    string
 		len      int
-		valueAt0 int
-		posOf0   int
+		valueAt0 int64
+		posOf0   int64
 	}{
 		{
 			`deal with increment 7
@@ -210,7 +215,7 @@ func TestFirst(t *testing.T) {
 	shuf, err := parseProcess(f, 10007)
 	a.NoError(err)
 
-	a.Equal(3589, shuf.NewPos(2019))
+	a.Equal(int64(3589), shuf.NewPos(2019))
 }
 
 func TestSecond(t *testing.T) {
@@ -223,12 +228,19 @@ func TestSecond(t *testing.T) {
 	a.NoError(err)
 
 	inv := shuf.Inverse()
-	fmt.Printf("%#v", inv)
-	a.True(false)
-	p := 2020
-	for i := 0; i < 101_741_582_076_661; i++ {
+
+	p := int64(2020)
+	N := 101_741_582_076_661
+	cache := make(map[int64]bool)
+	for i := 0; i < N; i++ {
+		if cache[p] {
+			fmt.Println(p)
+			fmt.Println(shuf.NewPos(p))
+			panic(p)
+		}
+		cache[p] = true
 		if i%1_000_000 == 0 {
-			fmt.Println(float64(100*i) / 101_741_582_076_661)
+			fmt.Println(float64(100*i) / float64(N))
 		}
 		p = inv.NewPos(p)
 	}
