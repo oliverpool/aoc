@@ -55,6 +55,8 @@ func TestFirst(t *testing.T) {
 	})
 	a.NoError(err)
 
+	t.Skip()
+
 	// go test -c && ./d25.test
 	/*
 		- ornament
