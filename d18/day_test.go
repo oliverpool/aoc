@@ -302,6 +302,7 @@ func TestParseMap(t *testing.T) {
 }
 
 func TestFirst(t *testing.T) {
+	t.Skip() // too slow
 	a := assert.New(t)
 	f, err := os.Open("./input")
 	a.NoError(err)
@@ -312,4 +313,182 @@ func TestFirst(t *testing.T) {
 
 	d := pg.exploreBetter('@', 0, -1)
 	a.Equal(2946, d)
+}
+
+func parseMap4(r io.Reader) (poiGraph, error) {
+	scanner := bufio.NewScanner(r)
+	scanner.Split(bufio.ScanLines)
+
+	var rm rawMap
+	var textPrev string
+	for scanner.Scan() {
+		text := scanner.Text()
+		rm = append(rm, text)
+
+		i := strings.Index(textPrev, ".@.")
+		if i >= 0 {
+			n := len(rm)
+			rm[n-3] = rm[n-3][:i] + "@#?" + rm[n-3][i+3:]
+			rm[n-2] = rm[n-2][:i] + "###" + rm[n-2][i+3:]
+			rm[n-1] = rm[n-1][:i] + ">#=" + rm[n-1][i+3:]
+		}
+		textPrev = text
+	}
+	pois := rm.pois()
+	distances := make(poiGraph, len(pois))
+	for rp, c := range pois {
+		distances[rp] = rm.neighbors(c)
+	}
+
+	return distances, scanner.Err()
+}
+
+func TestParseMap4(t *testing.T) {
+	cc := []struct {
+		input           string
+		keyCount        int
+		originNeighbors int
+		steps           int
+	}{
+		{
+			`
+#######
+#a.#Cd#
+##...##
+##.@.##
+##...##
+#cB#Ab#
+#######`,
+			11,
+			1,
+			8,
+		},
+		{
+			`
+###############
+#d.ABC.#.....a#
+######...######
+######.@.######
+######...######
+#b.....#.....c#
+###############`,
+			11,
+			1,
+			24,
+		},
+		{
+			`
+#############
+#DcBa.#.GhKl#
+#.###...#I###
+#e#d#.@.#j#k#
+###C#...###J#
+#fEbA.#.FgHi#
+#############`,
+			27,
+			1,
+			32,
+		},
+		{
+			`
+#############
+#g#f.D#..h#l#
+#F###e#E###.#
+#dCba...BcIJ#
+#####.@.#####
+#nK.L...G...#
+#M###N#H###.#
+#o#m..#i#jk.#
+#############`,
+			32,
+			2,
+			72,
+		},
+	}
+	for _, c := range cc {
+		t.Run(c.input, func(t *testing.T) {
+			a := assert.New(t)
+
+			m, err := parseMap4(strings.NewReader(strings.TrimSpace(c.input)))
+			a.NoError(err)
+			a.NotNil(m)
+			a.Len(m, c.keyCount)
+			a.Len(m['@'], c.originNeighbors)
+
+			t.Log(m)
+
+			d := m.exploreBetter4([]rawPixel{'@', '?', '>', '='}, 0, -1)
+			a.Equal(c.steps, d)
+			// fmt.Println("done", c.steps, d)
+			// fmt.Println()
+		})
+	}
+}
+
+func (pg poiGraph) exploreBetter4(starts []rawPixel, current, best int) int {
+	// fmt.Println("explore4", starts)
+
+	bpg := pg.copy()
+	for _, start := range starts {
+		bpg.remove(start.Upper()) // open all doors
+	}
+
+	withoutNeighbors := 0
+	// for every start
+	for i, start := range starts {
+		cpg := bpg.copy()
+		neighbors := cpg[start]
+
+		if len(neighbors) == 0 {
+			withoutNeighbors += 1
+			continue
+		}
+
+		cpg.remove(start)
+		// fmt.Println(start, "start search", current, best)
+		for n, d := range neighbors {
+			if !n.isKey() {
+				continue
+			}
+			if best != -1 && current+d >= best {
+				// fmt.Println(start, "skip bigger", n, current+d, best)
+				continue
+			}
+			// fmt.Println(start, "explore", n)
+			newStarts := make([]rawPixel, 0, len(starts))
+			for j, s := range starts {
+				if j == i {
+					newStarts = append(newStarts, n)
+				} else {
+					newStarts = append(newStarts, s)
+				}
+			}
+			c := cpg.exploreBetter4(newStarts, current+d, best)
+			// fmt.Println(start, "explored", n, c)
+			if best == -1 || c < best {
+				// fmt.Println(start, "better found", n, c, best)
+				best = c
+			}
+		}
+	}
+	if withoutNeighbors == len(starts) {
+		// fmt.Println(starts, "empty")
+		return current
+	}
+	// fmt.Println(starts, "best found", best)
+	return best
+}
+
+func TestSecond(t *testing.T) {
+	t.Skip() // too slow
+	a := assert.New(t)
+	f, err := os.Open("./input")
+	a.NoError(err)
+	defer f.Close()
+
+	pg, err := parseMap4(f)
+	a.NoError(err)
+
+	d := pg.exploreBetter4([]rawPixel{'@', '?', '>', '='}, 0, -1)
+	a.Equal(1222, d)
 }
