@@ -58,8 +58,13 @@ func runComputer(intcodes map[int]int, addr int, send func(int, packet), recv <-
 				select {
 				case incoming = <-recv:
 					buffer = append(buffer, incoming)
-				case pInput <- -1:
-					isStalled = true
+				case <-time.After(time.Millisecond):
+					select {
+					case incoming = <-recv:
+						buffer = append(buffer, incoming)
+					case pInput <- -1:
+						isStalled = true
+					}
 				}
 			}
 			if wasStalled != isStalled {
