@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFirstCase(t *testing.T) {
+func TestOneExample(t *testing.T) {
 	assert.Equal(t, 514579, findProduct(2020,
 		1721,
 		979,
@@ -20,7 +20,7 @@ func TestFirstCase(t *testing.T) {
 		1456))
 }
 
-func TestFirst(t *testing.T) {
+func TestOne(t *testing.T) {
 	var expenses []int
 	var err error
 	err = open("./input", func(r io.Reader) error {
@@ -30,6 +30,28 @@ func TestFirst(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1010299, findProduct(2020, expenses...))
+}
+
+func TestTwoExample(t *testing.T) {
+	assert.Equal(t, 241861950, findProduct3(2020,
+		1721,
+		979,
+		366,
+		299,
+		675,
+		1456))
+}
+
+func TestTwo(t *testing.T) {
+	var expenses []int
+	var err error
+	err = open("./input", func(r io.Reader) error {
+		expenses, err = parseInput(r)
+		return err
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, 42140160, findProduct3(2020, expenses...))
 }
 
 func open(path string, cb func(io.Reader) error) error {

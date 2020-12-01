@@ -11,3 +11,14 @@ func findProduct(goal int, expenses ...int) int {
 	}
 	return 0
 }
+
+func findProduct3(goal int, expenses ...int) int {
+	for i, e := range expenses {
+		remaining := goal - e
+		found := findProduct(remaining, expenses[i+1:]...)
+		if found > 0 {
+			return found * e
+		}
+	}
+	return 0
+}
