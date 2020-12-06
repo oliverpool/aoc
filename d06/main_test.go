@@ -27,36 +27,61 @@ b`
 func TestFirst(t *testing.T) {
 	groups := parseInput(example)
 	require.Len(t, groups, 5)
-	s := sumUniqueQuestions(groups)
+	s := sumAnyoneQuestions(groups)
 	require.Equal(t, 11, s)
 
 	input, err := ioutil.ReadFile("./input")
 	require.NoError(t, err)
 	groups = parseInput(string(input))
-	s = sumUniqueQuestions(groups)
+	s = sumAnyoneQuestions(groups)
 	require.Equal(t, 6170, s)
 }
 
 func TestSecond(t *testing.T) {
+	groups := parseInput(example)
+	require.Len(t, groups, 5)
+	s := sumEveryoneQuestions(groups)
+	require.Equal(t, 6, s)
+
+	input, err := ioutil.ReadFile("./input")
+	require.NoError(t, err)
+	groups = parseInput(string(input))
+	s = sumEveryoneQuestions(groups)
+	require.Equal(t, 2947, s)
 }
 
-func sumUniqueQuestions(groups []string) int {
+func sumEveryoneQuestions(groups []string) int {
 	s := 0
 	for _, g := range groups {
-		s += len(uniqueQuestions(g))
+		m, c := uniqueQuestions(g)
+		for _, q := range m {
+			if c == q {
+				s++
+			}
+		}
+	}
+	return s
+}
+func sumAnyoneQuestions(groups []string) int {
+	s := 0
+	for _, g := range groups {
+		m, _ := uniqueQuestions(g)
+		s += len(m)
 	}
 	return s
 }
 
-func uniqueQuestions(s string) map[byte]bool {
-	m := make(map[byte]bool)
+func uniqueQuestions(s string) (map[byte]int, int) {
+	c := 1
+	m := make(map[byte]int)
 	for _, b := range s {
 		if b == '\n' {
+			c++
 			continue
 		}
-		m[byte(b)] = true
+		m[byte(b)]++
 	}
-	return m
+	return m, c
 }
 
 func parseInput(s string) []string {
