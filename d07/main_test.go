@@ -2,6 +2,7 @@ package main
 
 import (
 	"io/ioutil"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -31,6 +32,42 @@ func TestFirst(t *testing.T) {
 }
 
 func TestSecond(t *testing.T) {
+	bags := parseInputContent(example)
+	s := countBags("shiny gold", bags)
+	require.Equal(t, 32, s)
+
+	input, err := ioutil.ReadFile("./input")
+	require.NoError(t, err)
+	bags = parseInputContent(string(input))
+	s = countBags("shiny gold", bags)
+	require.Equal(t, 12128, s)
+}
+
+func parseInputContent(s string) map[string]map[string]int {
+	contains := make(map[string]map[string]int)
+	for _, l := range strings.Split(strings.TrimSpace(s), "\n") {
+		parts := strings.SplitN(l, " contain ", 2)
+		container := strings.TrimSuffix(parts[0], " bags")
+		contains[container] = make(map[string]int)
+
+		for _, contained := range strings.Split(parts[1], ", ") {
+			if contained == "no other bags." {
+				continue
+			}
+			contained = strings.TrimSuffix(contained, ".")
+			contained = strings.TrimSuffix(contained, "s")
+			contained = strings.TrimSuffix(contained, " bag")
+			sparts := strings.Split(contained, " ")
+			contained = strings.Join(sparts[1:], " ")
+			i, err := strconv.Atoi(sparts[0])
+			if err != nil {
+				panic(err)
+			}
+
+			contains[container][contained] = i
+		}
+	}
+	return contains
 }
 
 func parseInput(s string) map[string][]string {
