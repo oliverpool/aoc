@@ -34,20 +34,65 @@ func TestFirst(t *testing.T) {
 }
 
 func executeUntilLoop(prog map[int]instruction) (int, int) {
-	acc := 0
-	i := 0
-	d := 0
+	acc, i := 0, 0
 	visited := make(map[int]bool)
 	for !visited[i] {
 		visited[i] = true
-		acc, d = prog[i](acc)
-		i += d
-
+		acc, i = prog[i].execute(acc, i)
 	}
 	return acc, i
 }
 
-type instruction func(ac int) (acc int, offset int)
+func TestSecond(t *testing.T) {
+	prog := parseInput(example)
+	require.Equal(t, 9, len(prog))
+	acc, i := executeUntilLoopWithSwap(prog)
+	require.Equal(t, 8, acc)
+	require.Equal(t, 9, i)
+
+	input, err := ioutil.ReadFile("./input")
+	require.NoError(t, err)
+	prog = parseInput(string(input))
+	acc, i = executeUntilLoopWithSwap(prog)
+	require.Equal(t, 2001, acc)
+}
+
+func executeUntilLoopWithSwap(prog map[int]instruction) (int, int) {
+	acc, i := 0, 0
+	visited := make(map[int]bool)
+	for !visited[i] {
+		visited[i] = true
+		inst := prog[i]
+		switch in := inst.(type) {
+		case jmp:
+			facc, fi := nop(int(in)).execute(acc, i)
+			facc, fi = continueExecution(prog, facc, fi, visited)
+			if fi == len(prog) {
+				return facc, fi
+			}
+		case nop:
+			facc, fi := jmp(int(in)).execute(acc, i)
+			facc, fi = continueExecution(prog, facc, fi, visited)
+			if fi == len(prog) {
+				return facc, fi
+			}
+		}
+		acc, i = inst.execute(acc, i)
+	}
+	return acc, i
+}
+
+func continueExecution(prog map[int]instruction, acc, i int, visitedBefore map[int]bool) (int, int) {
+	visited := make(map[int]bool)
+	for !visited[i] && !visitedBefore[i] {
+		visited[i] = true
+		if i == len(prog) {
+			return acc, i
+		}
+		acc, i = prog[i].execute(acc, i)
+	}
+	return acc, i
+}
 
 func parseInput(s string) map[int]instruction {
 	program := make(map[int]instruction)
@@ -58,6 +103,28 @@ func parseInput(s string) map[int]instruction {
 	return program
 }
 
+type instruction interface {
+	execute(acc, i int) (int, int)
+}
+
+type nop int
+
+func (nop) execute(acc, i int) (int, int) {
+	return acc, i + 1
+}
+
+type jmp int
+
+func (j jmp) execute(acc, i int) (int, int) {
+	return acc, i + int(j)
+}
+
+type acc int
+
+func (a acc) execute(acc, i int) (int, int) {
+	return acc + int(a), i + 1
+}
+
 func parseInstruction(s string) instruction {
 	parts := strings.SplitN(s, " ", 2)
 	v, err := strconv.Atoi(parts[1])
@@ -66,17 +133,11 @@ func parseInstruction(s string) instruction {
 	}
 	switch parts[0] {
 	case "nop":
-		return func(acc int) (int, int) {
-			return acc, 1
-		}
+		return nop(v)
 	case "jmp":
-		return func(acc int) (int, int) {
-			return acc, v
-		}
+		return jmp(v)
 	case "acc":
-		return func(acc int) (int, int) {
-			return acc + v, 1
-		}
+		return acc(v)
 	default:
 		panic("unsupported instruction " + parts[0])
 	}
