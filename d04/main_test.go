@@ -71,7 +71,7 @@ iyr:2010 hgt:158cm hcl:#b6652a ecl:blu byr:1944 eyr:2021 pid:093154719`)
 	require.NoError(t, err)
 	batch = parseInput(string(input))
 
-	require.Equal(t, 237, countValidStrictPassports(batch))
+	require.Equal(t, 172, countValidStrictPassports(batch))
 }
 func parseInput(s string) []passport {
 	ss := strings.Split(strings.TrimSpace(s), "\n\n")
