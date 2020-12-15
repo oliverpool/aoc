@@ -26,6 +26,7 @@ func (s state) String() string {
 
 type instruction interface {
 	execute(*state)
+	executev2(*state)
 }
 
 func newMem(addr, value string) mem {
@@ -51,6 +52,17 @@ type mem struct {
 func (m mem) execute(s *state) {
 	previous := m.value
 	s.mem[m.address] = (previous&s.mask.and | s.mask.or)
+}
+func (m mem) executev2(s *state) {
+	addr := (m.address | s.mask.and) ^ (s.mask.or ^ s.mask.and)
+	for _, f := range s.mask.floatings() {
+		s.mem[addr|f] = m.value
+		// fmt.Printf("% 08b\n", addr)
+		// fmt.Printf("% 08b => %d\n", addr|f, m.value)
+		// for _, f := range ff {
+		// 	fmt.Printf("% 08b\n", f)
+		// }
+	}
 }
 
 func newMask(s string) mask {
@@ -78,6 +90,43 @@ type mask struct {
 
 func (m mask) execute(s *state) {
 	s.mask = m
+}
+
+func (m mask) executev2(s *state) {
+	s.mask = m
+}
+
+func enumerate(xor uint64) []uint64 {
+	if xor == 0 {
+		return nil
+	}
+	if xor == 1 {
+		return []uint64{0, 1}
+	}
+	if xor%2 == 0 {
+		got := enumerate(xor / 2)
+		ff := make([]uint64, 0, len(got))
+		for _, g := range got {
+			ff = append(ff, 2*g)
+		}
+		return ff
+	}
+	got := enumerate((xor - 1) / 2)
+	ff := make([]uint64, 0, 2*len(got))
+	for _, g := range got {
+		ff = append(ff, 2*g, 2*g+1)
+	}
+	return ff
+}
+
+func (m mask) floatings() []uint64 {
+	xor := m.or ^ m.and
+	ff := enumerate(xor)
+	// fmt.Printf("=> % 08b\n", xor)
+	// for _, f := range ff {
+	// 	fmt.Printf("% 08b\n", f)
+	// }
+	return ff
 }
 
 func parseInput(s string) (inst []instruction) {
@@ -119,4 +168,36 @@ func TestFirst(t *testing.T) {
 	prog = parseInput(string(input))
 	s = runAndSum(prog)
 	require.Equal(t, uint64(14954914379452), s)
+}
+
+func runAndSumVersion2(inst []instruction) uint64 {
+	s := state{
+		mem: make(map[uint64]uint64),
+	}
+	for _, i := range inst {
+		i.executev2(&s)
+	}
+	var sum uint64
+	for _, v := range s.mem {
+		sum += v
+	}
+	return sum
+}
+
+func TestSecond(t *testing.T) {
+	prog := parseInput(`mask = 000000000000000000000000000000X1001X
+mem[42] = 100
+mask = 00000000000000000000000000000000X0XX
+mem[26] = 1`)
+	s := runAndSumVersion2(prog)
+	t.Log(s)
+	require.Equal(t, uint64(208), s)
+
+	input, err := ioutil.ReadFile("./input")
+	require.NoError(t, err)
+	prog = parseInput(string(input))
+	s = runAndSumVersion2(prog)
+	t.Log(s)
+	// 135703051814: to low
+	require.Equal(t, uint64(3415488160714), s)
 }
